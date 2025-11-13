@@ -22,3 +22,10 @@ else
     fi 
 fi
 
+#validación segundo parametro
+if [ $2 = "-c" ]; then
+    password=$3
+else
+    archivo=$2
+fi
+
