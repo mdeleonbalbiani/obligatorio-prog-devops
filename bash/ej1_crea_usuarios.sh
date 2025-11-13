@@ -28,9 +28,13 @@ else
     archivo="$1"
 fi
 
-#Validación segundo parametro
-if [ $2 = "-c" ]; then
-    password=$3
+# Validación segundo parámetro (si existe)
+if [ "$2" = "-c" ]; then
+    #Validación que contraseña no sea vacía
+    if [ -z "$3" ]; then
+        echo "Error: Falta la contraseña después de -c." >&2
+        exit 3
+    fi
+    password="$3"
 fi
-
 
