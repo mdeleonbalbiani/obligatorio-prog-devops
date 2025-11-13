@@ -3,7 +3,10 @@
 #Inizialización
 modo_info=false
 password=""
-archivo=""
+#Obtener el total de parametros
+total_params=$#
+#Obtener el archivo (ultimo parametro)
+archivo="${!total_params}"
 
 #Validar que haya al menos un parametro
 if [ $# -eq 0 ]; then
@@ -22,10 +25,9 @@ else
     fi 
 fi
 
-#validación segundo parametro
+#Validación segundo parametro
 if [ $2 = "-c" ]; then
     password=$3
-else
-    archivo=$2
 fi
+
 
