@@ -21,6 +21,7 @@ archivo="${!total}"        # Parámetro número $total = archivo
 i=1  # contador para recorrer los parámetros
 
 while [ $i -lt $total ]; do
+    # ${!i} = expansión indirecta, toma el parámetro número i (si i=2, esto es $2)
     param="${!i}"   # obtiene el parámetro actual (ej: $1, $2, ...)
 
     case "$param" in
@@ -41,6 +42,7 @@ while [ $i -lt $total ]; do
             fi
 
             # Guardamos la contraseña que está en el siguiente parámetro
+            # ${!next} obtiene el parámetro donde está la contraseña (por ejemplo $3 o $4)
             password="${!next}"
 
             # Saltamos ese parámetro extra
