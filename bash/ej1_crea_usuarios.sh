@@ -60,6 +60,29 @@ while [ $i -lt $total ]; do
 done
 
 # Mostrar los resultados (solo para pruebas)
+echo "----- Resultados de los paramentros ----"
 echo "Modo informativo: $modo_info"
 echo "Contraseña: ${password:+(proporcionada)}"
 echo "Archivo: $archivo"
+echo "---------------------------------------"
+
+# --- Validación del archivo ---
+# Verificar que el archivo existe
+if [ ! -e "$archivo" ]; then
+    echo "Error: El archivo '$archivo' no existe." >&2
+    exit 4
+fi
+
+# Verificar que es un archivo regular (no un directorio)
+if [ ! -f "$archivo" ]; then
+    echo "Error: '$archivo' no es un archivo regular." >&2
+    exit 5
+fi
+
+# Verificar permisos de lectura
+if [ ! -r "$archivo" ]; then
+    echo "Error: No se tienen permisos de lectura sobre '$archivo'." >&2
+    exit 6
+fi
+
+
