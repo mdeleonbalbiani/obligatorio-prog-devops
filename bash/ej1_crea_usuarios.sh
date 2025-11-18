@@ -61,6 +61,7 @@ done
 
 # Mostrar los resultados (solo para pruebas)
 echo "----- Resultados de los paramentros ----"
+echo "-------- (solo para pruebas) -----------"
 echo "Modo informativo: $modo_info"
 echo "Contraseña: ${password:+(proporcionada)}"
 echo "Archivo: $archivo"
@@ -83,6 +84,98 @@ fi
 if [ ! -r "$archivo" ]; then
     echo "Error: No se tienen permisos de lectura sobre '$archivo'." >&2
     exit 6
+fi
+
+# --- Procesamiento del archivo ---
+
+# Contador de usuarios creados con éxito
+exito=0
+
+# Leer el archivo línea por línea
+while IFS= read -r linea; do
+
+    # Saltar líneas vacías
+    [ -z "$linea" ] && continue
+
+    # Separar campos
+    user=$(echo "$linea" | cut -d ":" -f1)
+    comment=$(echo "$linea" | cut -d ":" -f2)
+    home=$(echo "$linea" | cut -d ":" -f3)
+    crear_home=$(echo "$linea" | cut -d ":" -f4)
+    shell=$(echo "$linea" | cut -d ":" -f5)
+
+    # Validar que haya exactamente 5 campos
+    total_campos=$(echo "$linea" | awk -F":" '{print NF}')
+    if [ "$total_campos" -ne 5 ]; then
+        echo "Error: línea '$linea' con formato incorrecto" >&2
+        exit 7
+    fi
+
+    # Nombre de usuario no puede estar vacío
+    if [ -z "$user" ]; then
+        echo "Error: nombre de usuario vacío en línea '$linea'" >&2
+        exit 8
+    fi
+
+    # Valores por defecto si el campo está vacío
+    [ -z "$comment" ] && comment=""
+    [ -z "$home" ] && home="/home/$user"
+    [ -z "$crear_home" ] && crear_home="NO"
+    [ -z "$shell" ] && shell="/bin/bash"
+
+    # Inicializamos variable
+    cmd=(useradd)
+
+    # Crear o no crear directorio home
+    if [ "$crear_home" = "NO" ]; then
+        cmd+=(-M)   # NO crear home
+    else
+        cmd+=(-m)   # Crear home
+    fi
+
+    # Parámetros obligatorios
+    cmd+=(-d "$home")
+    cmd+=(-s "$shell")
+    cmd+=(-c "$comment")
+
+    # Nombre del usuario al final
+    cmd+=("$user")
+
+    # ----- Ejecutar el comando useradd -----
+    "${cmd[@]}"
+    resultado=$?
+
+    # ----- Procesar resultados -----
+
+    if [ $resultado -eq 0 ]; then
+        exito=$((exito+1))
+
+        if $modo_info; then
+            echo "Usuario $user creado con éxito con datos indicados:"
+            echo "Comentario: ${comment:-<valor por defecto>}"
+            echo "Dir home: $home"
+            echo "Asegurado existencia de directorio home: $crear_home"
+            echo "Shell por defecto: $shell"
+            echo
+        fi
+
+        # Si hay contraseña, setearla
+        if [ -n "$password" ]; then
+            echo "$user:$password" | chpasswd
+        fi
+
+    else
+        if $modo_info; then
+            echo "ATENCION: el usuario $user no pudo ser creado"
+            echo
+        fi
+    fi
+
+done < "$archivo"
+
+# Al final, mostrar total si se pidió -i
+if $modo_info; then
+    echo "Se han creado $exito usuarios con éxito."
 fi
 
 
