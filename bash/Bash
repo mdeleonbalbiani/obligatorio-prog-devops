@@ -1,0 +1,120 @@
+#!/bin/bash
+# ============================================================================
+# Script: ej1_crea_usuarios.sh
+# ============================================================================
+
+informar=0
+password=""
+archivo=""
+
+# Validación inicial
+if [ $# -lt 1 ]; then
+    echo "Error: cantidad insuficiente de parámetros." >&2
+    exit 1
+fi
+
+# Procesamiento de parámetros
+while [ $# -gt 0 ]; do
+
+    case "$1" in
+        -i)
+            informar=1
+            shift
+            ;;
+
+        -c)
+            shift
+            if [ -z "$1" ]; then
+                echo "Error: falta la contraseña luego de -c" >&2
+                exit 2
+            fi
+            password="$1"
+            shift
+            ;;
+
+        *)
+            archivo="$1"
+            shift
+            ;;
+    esac
+done
+
+# Validaciones del archivo
+if [ -z "$archivo" ]; then
+    echo "ERROR: no se especificó archivo de usuarios." >&2
+    exit 3
+fi
+
+if [ ! -e "$archivo" ]; then
+    echo "ERROR: el archivo '$archivo' no existe." >&2
+    exit 4
+fi
+
+if [ ! -f "$archivo" ]; then
+    echo "ERROR: '$archivo' no es un archivo regular." >&2
+    exit 5
+fi
+
+if [ ! -r "$archivo" ]; then
+    echo "ERROR: no se tienen permisos de lectura sobre '$archivo'." >&2
+    exit 6
+fi
+
+total_creados=0
+
+# Leer archivo
+while IFS=':' read -r usuario comentario dirhome crearhome shell; do
+
+    # Saltar líneas vacías
+    [ -z "$usuario" ] && continue
+
+    # Valores por defecto
+    comentario=${comentario:-"<sin comentario>"}
+    dirhome=${dirhome:-"/home/$usuario"}
+    crearhome=${crearhome:-"SI"}
+    shell=${shell:-"/bin/bash"}
+
+    # Construcción segura del comando useradd
+    CMD=(useradd -s "$shell" -c "$comentario")
+
+    if [ "$crearhome" = "SI" ]; then
+        CMD+=("-m" -d "$dirhome")
+    else
+        CMD+=("-M" -d "$dirhome")
+    fi
+
+    CMD+=("$usuario")
+
+    # Ejecutar comando
+    if "${CMD[@]}" >/dev/null 2>&1; then
+
+        # Asignar contraseña si corresponde
+        if [ -n "$password" ]; then
+            echo "$usuario:$password" | chpasswd >/dev/null 2>&1
+        fi
+
+        total_creados=$((total_creados + 1))
+
+        if [ "$informar" -eq 1 ]; then
+            echo "Usuario $usuario creado:"
+            echo "  Comentario: $comentario"
+            echo "  Home:       $dirhome"
+            echo "  CrearHome:  $crearhome"
+            echo "  Shell:      $shell"
+            echo
+        fi
+
+    else
+        if [ "$informar" -eq 1 ]; then
+            echo "ATENCIÓN: no se pudo crear el usuario $usuario"
+            echo
+        fi
+    fi
+
+done < "$archivo"
+
+# Informe final
+echo "Se han creado $total_creados usuarios con éxito."
+
+
+exit 0
