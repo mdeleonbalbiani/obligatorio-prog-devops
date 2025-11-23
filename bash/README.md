@@ -49,15 +49,21 @@ sudo ./ej1_crea_usuarios.sh [OPCIONES] archivo_usuarios
    sudo ./ej1_crea_usuarios.sh usuarios.txt
    ```
 
-2. Crear usuarios con contraseña y modo informativo:
+2. Crear usuarios con contraseña:
+   ```bash
+   sudo ./ej1_crea_usuarios.sh -c "P@ssw0rd" usuarios.txt
+   ```
+
+3. Ver información detallada de la creación de usuarios:
+   ```bash
+   sudo ./ej1_crea_usuarios.sh -i usuarios.txt
+   ```
+
+4. Combinar modo informativo con contraseña:
    ```bash
    sudo ./ej1_crea_usuarios.sh -i -c "P@ssw0rd" usuarios.txt
    ```
 
-3. Ver información de usuarios que se crearán (sin crearlos):
-   ```bash
-   sudo ./ej1_crea_usuarios.sh -i usuarios.txt
-   ```
 
 ## Códigos de Salida
 
