@@ -148,6 +148,108 @@ Comando con archivo sin permisos de lectura debe mostrar mensaje de error y sali
 
 ![Sin permisos](bash/imagenes/sin-permisos.png)
 
+### 3. Validaciones del contenido del archivo
+
+#### a. Línea con formato incorrecto (distinta cantidad de campos)
+
+Comando con línea con formato incorrecto debe mostrar mensaje de error y salir con código 7.
+
+![Formato incorrecto](bash/imagenes/formato-incorrecto.png)
+
+#### b. Nombre de usuario vacío
+
+Comando con nombre de usuario vacío debe mostrar mensaje de error y salir con código 8.
+
+![Nombre vacío](bash/imagenes/nombre-vacio.png)
+
+### 4. Creación correcta de usuarios
+
+#### Configuraciones previas a ejecución del archivo
+
+![Configuraciones previas](bash/imagenes/usuarios-previos-y-archivo.png)
+
+#### Ejecución del comando
+
+![Comando ejecutado](bash/imagenes/ejecucion.png)
+
+- Parametros mapeados correctamente y mostrados a modo de prueba
+- Usuarios creados exitosamente y con el modo informativo activo
+- Indicación de cantidad de usuarios creados, por tener activo el modo informativo
+
+#### a. Validación de creación de usuarios
+
+Con el comando `getent passwd <usuario>` se confirma que el usuario fue creado mostrando la línea completa de /etc/passwd
+
+![Usuarios creados](bash/imagenes/usuarios-creados.png)
+
+#### b. Verificación HOME creado o no creado
+
+Se verifica que el directorio home se haya creado o no, dependiendo de lo detallado en el archivo de entrada.
+Con el comando `ls -ld /home/<usuario>` se verifica la existencia del directorio home.
+
+##### Resultado esperado
+
+| Usuario | Campo HOME  | Campo crear_home | Debe existir |
+| ------- | ----------- | ---------------- | ------------ |
+| juan    | /home/juan  | SI               | Sí           |
+| maria   | /home/maria | NO               | No           |
+| pepe    | /home/pepe  | SI               | Sí           |
+| lucho   | (vacío)     | NO               | No           |
+| ana     | /home/ana   | SI               | Sí           |
+| ramiro  | (vacío)     | SI               | Sí           |
+
+##### Resultado
+
+![](bash/imagenes/home.png)
+
+#### c. Verificación SHELL asignada
+
+Se verifica que el shell del usuario se haya asignado correctamente, dependiendo de lo detallado en el archivo de entrada.
+Con el comando `getent passwd <usuario> | cut -d: -f7` se muestra solo el shell del usuario.
+
+##### Resultado esperado
+
+| Usuario | Campo SHELL | Debe ser     |
+| ------- | ----------- | ------------ |
+| juan    | /bin/bash   | /bin/bash    |
+| maria   | /bin/sh     | /bin/sh      |
+| pepe    | /bin/bash   | /bin/bash    |
+| lucho   | (vacío)     | /bin/bash (por defecto)    |
+| ana     | /bin/bash   | /bin/zsh     |
+| ramiro  | /bin/zsh    | /bin/bash    |
+
+##### Resultado
+![Shell asignado](bash/imagenes/shell.png)
+
+#### d. Verificación Comentarios
+
+Se verifica que el comentario del usuario se haya asignado correctamente, dependiendo de lo detallado en el archivo de entrada.
+Con el comando `getent passwd <usuario> | cut -d: -f5` se muestra solo el comentario del usuario.
+
+![Comentarios asignados](bash/imagenes/comentario.png)
+
+#### e. Verificación de contraseña
+
+Se verifica que la contraseña se haya asignado correctamente a los usuarios creados.
+Con el comando `passwd -S <usuario>` se muestra el estado de la contraseña del usuario.
+El primer carácter del estado debe ser P (password set) para indicar que la contraseña está configurada.
+
+![Contraseñas asignadas](bash/imagenes/password.png)
+
+#### f. Verificación de login a un usuario
+
+Se verifica que se pueda iniciar sesión con las contraseñas asignadas.
+Con el comando `su - <usuario>` se intenta iniciar sesión como el usuario.
+
+![Login](bash/imagenes/login.png)
+
+#### g. Verificación de re-ejecución (Usuarios ya existen)
+
+Se ejecuta el script nuevamente para verificar que no intente crear usuarios que ya existen.
+El script debe mostrar mensajes indicando que los usuarios ya existen y no crear duplicados.
+
+![Re-ejecución](bash/imagenes/re-ejecucion.png)
+
 ## Notas
 
 - Se requiere ejecutar el script con privilegios de superusuario (sudo)
