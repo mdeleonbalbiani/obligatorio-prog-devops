@@ -114,19 +114,19 @@ grep usuario2 /etc/passwd
 
 Comando sin argumentos debe mostrar mensaje de error y salir con código 1.
 
-![Sin argumentos](bash/imagenes/comando-sin-arg.png)
+![Sin argumentos](imagenes/comando-sin-arg.png)
 
 #### b. Opción desconocida
 
 Comando con opción desconocida debe mostrar mensaje de error y salir con código 3.
 
-![Argumento desconocido](bash/imagenes/arg-desconocido.png)
+![Argumento desconocido](imagenes/arg-desconocido.png)
 
 #### c. Falta de contraseña después de -c
 
 Comando con -c sin contraseña debe mostrar mensaje de error y salir con código 2.
 
-![Falta contraseña](bash/imagenes/sin-pass.png)
+![Falta contraseña](imagenes/sin-pass.png)
 
 ### 2. Verificación de archivo
 
@@ -134,19 +134,19 @@ Comando con -c sin contraseña debe mostrar mensaje de error y salir con código
 
 Comando con archivo inexistente debe mostrar mensaje de error y salir con código 4.
 
-![Archivo inexistente](bash/imagenes/archivo-inexistente.png)
+![Archivo inexistente](imagenes/archivo-inexistente.png)
 
 #### b. Archivo no regular
 
 Comando con archivo que no es regular debe mostrar mensaje de error y salir con código 5.
 
-![Archivo no regular](bash/imagenes/archivo-no-regular.png)
+![Archivo no regular](imagenes/archivo-no-regular.png)
 
 #### c. Sin permisos de lectura
 
 Comando con archivo sin permisos de lectura debe mostrar mensaje de error y salir con código 6.
 
-![Sin permisos](bash/imagenes/sin-permisos.png)
+![Sin permisos](imagenes/sin-permisos.png)
 
 ### 3. Validaciones del contenido del archivo
 
@@ -154,23 +154,23 @@ Comando con archivo sin permisos de lectura debe mostrar mensaje de error y sali
 
 Comando con línea con formato incorrecto debe mostrar mensaje de error y salir con código 7.
 
-![Formato incorrecto](bash/imagenes/formato-incorrecto.png)
+![Formato incorrecto](imagenes/formato-incorrecto.png)
 
 #### b. Nombre de usuario vacío
 
 Comando con nombre de usuario vacío debe mostrar mensaje de error y salir con código 8.
 
-![Nombre vacío](bash/imagenes/nombre-vacio.png)
+![Nombre vacío](imagenes/nombre-vacio.png)
 
 ### 4. Creación correcta de usuarios
 
 #### Configuraciones previas a ejecución del archivo
 
-![Configuraciones previas](bash/imagenes/usuarios-previos-y-archivo.png)
+![Configuraciones previas](imagenes/usuarios-previos-y-archivo.png)
 
 #### Ejecución del comando
 
-![Comando ejecutado](bash/imagenes/ejecucion.png)
+![Comando ejecutado](imagenes/ejecucion.png)
 
 - Parametros mapeados correctamente y mostrados a modo de prueba
 - Usuarios creados exitosamente y con el modo informativo activo
@@ -180,7 +180,7 @@ Comando con nombre de usuario vacío debe mostrar mensaje de error y salir con c
 
 Con el comando `getent passwd <usuario>` se confirma que el usuario fue creado mostrando la línea completa de /etc/passwd
 
-![Usuarios creados](bash/imagenes/usuarios-creados.png)
+![Usuarios creados](imagenes/usuarios-creados.png)
 
 #### b. Verificación HOME creado o no creado
 
@@ -200,7 +200,7 @@ Con el comando `ls -ld /home/<usuario>` se verifica la existencia del directorio
 
 ##### Resultado
 
-![](bash/imagenes/home.png)
+![](imagenes/home.png)
 
 #### c. Verificación SHELL asignada
 
@@ -219,14 +219,14 @@ Con el comando `getent passwd <usuario> | cut -d: -f7` se muestra solo el shell 
 | ramiro  | /bin/zsh    | /bin/bash    |
 
 ##### Resultado
-![Shell asignado](bash/imagenes/shell.png)
+![Shell asignado](imagenes/shell.png)
 
 #### d. Verificación Comentarios
 
 Se verifica que el comentario del usuario se haya asignado correctamente, dependiendo de lo detallado en el archivo de entrada.
 Con el comando `getent passwd <usuario> | cut -d: -f5` se muestra solo el comentario del usuario.
 
-![Comentarios asignados](bash/imagenes/comentario.png)
+![Comentarios asignados](imagenes/comentario.png)
 
 #### e. Verificación de contraseña
 
@@ -234,21 +234,21 @@ Se verifica que la contraseña se haya asignado correctamente a los usuarios cre
 Con el comando `passwd -S <usuario>` se muestra el estado de la contraseña del usuario.
 El primer carácter del estado debe ser P (password set) para indicar que la contraseña está configurada.
 
-![Contraseñas asignadas](bash/imagenes/password.png)
+![Contraseñas asignadas](imagenes/password.png)
 
 #### f. Verificación de login a un usuario
 
 Se verifica que se pueda iniciar sesión con las contraseñas asignadas.
 Con el comando `su - <usuario>` se intenta iniciar sesión como el usuario.
 
-![Login](bash/imagenes/login.png)
+![Login](imagenes/login.png)
 
 #### g. Verificación de re-ejecución (Usuarios ya existen)
 
 Se ejecuta el script nuevamente para verificar que no intente crear usuarios que ya existen.
 El script debe mostrar mensajes indicando que los usuarios ya existen y no crear duplicados.
 
-![Re-ejecución](bash/imagenes/re-ejecucion.png)
+![Re-ejecución](imagenes/re-ejecucion.png)
 
 ## Notas
 
