@@ -123,6 +123,15 @@ while IFS= read -r linea; do
     [ -z "$crear_home" ] && crear_home="NO"
     [ -z "$shell" ] && shell="/bin/bash"
 
+    # Validar que el usuario no exista 
+    if id "$user" &>/dev/null; then
+        if $modo_info; then
+            echo "ATENCION: el usuario $user ya existe, se omite."
+        fi
+        # Salgo del while
+        continue
+    fi
+
     # Inicializamos variable
     cmd=(useradd)
 
@@ -159,7 +168,7 @@ while IFS= read -r linea; do
             echo
         fi
 
-        # Si hay contraseña, setearla
+        # Si hay contraseña, settearla
         if [ -n "$password" ]; then
             echo "$user:$password" | chpasswd
         fi
