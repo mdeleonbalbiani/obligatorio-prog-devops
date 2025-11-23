@@ -106,6 +106,48 @@ grep usuario1 /etc/passwd
 grep usuario2 /etc/passwd
 ```
 
+## Validaciones de funcionamiento
+
+### 1. Verificación de argumentos
+
+#### a. Sin argumentos
+
+Comando sin argumentos debe mostrar mensaje de error y salir con código 1.
+
+![Sin argumentos](bash/imagenes/comando-sin-arg.png)
+
+#### b. Opción desconocida
+
+Comando con opción desconocida debe mostrar mensaje de error y salir con código 3.
+
+![Argumento desconocido](bash/imagenes/arg-desconocido.png)
+
+#### c. Falta de contraseña después de -c
+
+Comando con -c sin contraseña debe mostrar mensaje de error y salir con código 2.
+
+![Falta contraseña](bash/imagenes/sin-pass.png)
+
+### 2. Verificación de archivo
+
+#### a. Archivo inexistente
+
+Comando con archivo inexistente debe mostrar mensaje de error y salir con código 4.
+
+![Archivo inexistente](bash/imagenes/archivo-inexistente.png)
+
+#### b. Archivo no regular
+
+Comando con archivo que no es regular debe mostrar mensaje de error y salir con código 5.
+
+![Archivo no regular](bash/imagenes/archivo-no-regular.png)
+
+#### c. Sin permisos de lectura
+
+Comando con archivo sin permisos de lectura debe mostrar mensaje de error y salir con código 6.
+
+![Sin permisos](bash/imagenes/sin-permisos.png)
+
 ## Notas
 
 - Se requiere ejecutar el script con privilegios de superusuario (sudo)
