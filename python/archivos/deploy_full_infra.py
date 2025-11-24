@@ -8,7 +8,7 @@ import os
 # CONFIGURACIÓN GENERAL
 # ============================
 REGION = "us-east-1"
-AMI_ID = "ami-0c2d06d50ce30b442" 
+AMI_ID = "ami-06b21ccaeff8cd686"
 INSTANCE_TYPE = "t3.micro"
 
 # Nombres personalizados
@@ -52,8 +52,8 @@ s3 = boto3.client("s3")
 print("Creando Security Group...")
 
 sg = ec2.create_security_group(
-    GroupName="SG-BancoRiendo444",
-    Description="SG para Banco_Riendo solo puerto 80"
+    GroupName="SG-BancoRiendo",
+    Description="SG Banco_Riendo puerto 80 y 3306"
 )
 
 sg_id = sg["GroupId"]
@@ -89,7 +89,7 @@ rds.create_db_instance(
     AllocatedStorage=20,
     DBInstanceClass="db.t3.micro",
     Engine="mariadb",
-    EngineVersion="10.11.6",
+    EngineVersion="10.5.28",
     MasterUsername=DB_USER,
     MasterUserPassword=DB_PASS,
     DBName=DB_NAME,
@@ -118,7 +118,7 @@ runcmd:
   - dnf clean all
   - dnf makecache
   - dnf -y update
-  - dnf -y install httpd php php-cli php-fpm php-common php-mysqlnd mariadb awscli
+  - dnf -y install httpd php php-cli php-fpm php-common php-mysqlnd mariadb105 awscli
 
 
   - systemctl enable --now httpd
@@ -133,10 +133,14 @@ runcmd:
     EOF
 
   - systemctl restart httpd php-fpm
+  - echo "<?php phpinfo(); ?>" > /var/www/html/info.php
+
 
   # Crear estructura
   - mkdir -p {REMOTE_WEBROOT}
   - mkdir -p {REMOTE_VARWWW}
+  - chown -R apache:apache /var/www/html
+
 
   # Descargar archivos desde S3
   # - dnf -y install awscli
@@ -163,7 +167,7 @@ runcmd:
   # Ejecutar script SQL contra RDS
   - mysql -h {DB_ENDPOINT} -u {DB_USER} -p{DB_PASS} {DB_NAME} < {REMOTE_VARWWW}/init_db.sql
 
-  - systemctl restart httpd
+  - systemctl restart httpd php-fpm
 """
 
 # ============================
