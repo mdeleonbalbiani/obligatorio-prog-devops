@@ -17,14 +17,11 @@ DB_INSTANCE_ID = "app-mysql"
 DB_NAME = "app"
 DB_USER = "admin"
 
-LOCAL_FILES_DIR = os.path.expanduser("~/obligatorio-prog-devops/python/archivos")
+LOCAL_FILES_DIR = "~/obligatorio-prog-devops/python/archivos"
 PASSWORD_FILE = "./password.txt"
 
 REMOTE_WEBROOT = "/var/www/html"
 REMOTE_VARWWW = "/var/www"
-
-BUCKET_NAME = "app-bancoriendo"
-SG_NAME = "SG-BancoRiendo"
 
 # ============================
 # LEER PASSWORD DEL TXT
@@ -52,8 +49,8 @@ s3 = boto3.client("s3")
 print("Creando Security Group...")
 
 sg = ec2.create_security_group(
-    GroupName="SG-BancoRiendo444",
-    Description="SG para Banco_Riendo solo puerto 80"
+    GroupName="SG-BancoRiendo",
+    Description="SG para Banco_Riendo — solo puerto 80"
 )
 
 sg_id = sg["GroupId"]
@@ -66,14 +63,7 @@ ec2.authorize_security_group_ingress(
             "FromPort": 80,
             "ToPort": 80,
             "IpRanges": [{"CidrIp": "0.0.0.0/0"}]
-        },
-        {
-            "IpProtocol": "tcp",
-            "FromPort": 3306,
-            "ToPort": 3306,
-            "IpRanges": [{"CidrIp": "0.0.0.0/0"}]
         }
-
     ]
 )
 print("Security Group creado:", sg_id)
@@ -89,7 +79,7 @@ rds.create_db_instance(
     AllocatedStorage=20,
     DBInstanceClass="db.t3.micro",
     Engine="mariadb",
-    EngineVersion="10.11.6",
+    EngineVersion="10.6.14",
     MasterUsername=DB_USER,
     MasterUserPassword=DB_PASS,
     DBName=DB_NAME,
@@ -118,8 +108,7 @@ runcmd:
   - dnf clean all
   - dnf makecache
   - dnf -y update
-  - dnf -y install httpd php php-cli php-fpm php-common php-mysqlnd mariadb awscli
-
+  - dnf -y install httpd php php-cli php-fpm php-common php-mysqlnd mariadb105
 
   - systemctl enable --now httpd
   - systemctl enable --now php-fpm
@@ -139,7 +128,6 @@ runcmd:
   - mkdir -p {REMOTE_VARWWW}
 
   # Descargar archivos desde S3
-  # - dnf -y install awscli
   - aws s3 sync s3://app-bancoriendo {REMOTE_WEBROOT}
 
   # Mover init_db.sql fuera del webroot
@@ -169,16 +157,22 @@ runcmd:
 # ============================
 # SUBIR ARCHIVOS A S3
 # ============================
+bucket_name = "app-bancoriendo"
+
 print("Creando bucket S3...")
-s3.create_bucket(Bucket=BUCKET_NAME)
+s3.create_bucket(
+    Bucket=bucket_name,
+    CreateBucketConfiguration={"LocationConstraint": REGION}
+)
 
 print("Subiendo archivos al bucket S3...")
+
 for root, dirs, files in os.walk(LOCAL_FILES_DIR):
     for file in files:
         full = os.path.join(root, file)
-        key = os.path.relpath(full, LOCAL_FILES_DIR).replace("\\", "/")
+        key = file
         print("Subiendo:", key)
-        s3.upload_file(full, BUCKET_NAME, key)
+        s3.upload_file(full, bucket_name, key)
 
 
 # ============================
