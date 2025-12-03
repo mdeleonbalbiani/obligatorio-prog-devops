@@ -3,6 +3,7 @@ import boto3
 import time
 import json
 import os
+import sys
 
 # ============================
 # CONFIGURACIÓN GENERAL
@@ -12,18 +13,16 @@ AMI_ID = "ami-06b21ccaeff8cd686"
 INSTANCE_TYPE = "t3.micro"
 EC2_NAME = "Banco_Riendo"
 DB_INSTANCE_ID = "app-sqlbanco"
-DB_NAME = "app"
+DB_NAME = "RRHHapp"
 DB_USER = "admin"
 
 LOCAL_FILES_DIR = os.path.expanduser("~/obligatorio-prog-devops/python/archivos")
 PASSWORD_FILE = os.path.expanduser("~/obligatorio-prog-devops/python/archivos/password.txt")
 
-REMOTE_WEBROOT = "/var/www/html"
-REMOTE_VARWWW = "/var/www"
-
 BUCKET_NAME = "app-bancoriendo"
-SG1_NAME = "SG1_Puerto80_Publico"
-SG2_NAME = "SG2_SoloDesdeSG1"
+
+APP_USER = "admin"
+APP_PASS = "admin123"
 
 # ============================
 # LEER PASSWORD DEL TXT
@@ -35,6 +34,8 @@ if not os.path.exists(PASSWORD_FILE):
 with open(PASSWORD_FILE, "r") as f:
     DB_PASS = f.read().strip()
 
+print("Password cargado correctamente.")
+
 # ============================
 # CLIENTES AWS
 # ============================
@@ -43,28 +44,22 @@ rds = boto3.client("rds", region_name=REGION)
 s3 = boto3.client("s3", region_name=REGION)
 
 # ============================
-# Obtener VPC por defecto
-# ============================
-vpcs = ec2.describe_vpcs().get("Vpcs", [])
-if not vpcs:
-    print("ERROR: No se encontraron VPCs en la cuenta/region.")
-    exit(1)
-
-vpc_id = vpcs[0]["VpcId"]
-print("Usando VPC:", vpc_id)
-
-# ============================
 # Crear Security Group 1
 # ============================
-sg1 = ec2.create_security_group(
-    GroupName="SG1_Puerto80_Publico",
-    Description="SG puerto 80 abierto al mundo",
+print("Creando Security Groups...")
+
+vpc_id = ec2.describe_vpcs()["Vpcs"][0]["VpcId"]
+
+# SG público para EC2
+sg_ec2 = ec2.create_security_group(
+    GroupName="SG_Publico_HTTP",
+    Description="HTTP abierto al mundo",
     VpcId=vpc_id
 )
-sg1_id = sg1["GroupId"]
+sg_ec2_id = sg_ec2["GroupId"]
 
 ec2.authorize_security_group_ingress(
-    GroupId=sg1_id,
+    GroupId=sg_ec2_id,
     IpPermissions=[
         {
             "IpProtocol": "tcp",
@@ -75,31 +70,30 @@ ec2.authorize_security_group_ingress(
     ]
 )
 
-print("SG1 creado:", sg1_id)
-
 # ============================
 # Crear Security Group 2
 # ============================
-sg2 = ec2.create_security_group(
-    GroupName="SG2_SoloDesdeSG1",
-    Description="SG que solo permite trafico desde SG1",
+sg_rds = ec2.create_security_group(
+    GroupName="SG_RDS_Privado",
+    Description="SQL permitido solo desde EC2",
     VpcId=vpc_id
 )
-sg2_id = sg2["GroupId"]
+sg_rds_id = sg_rds["GroupId"]
 
 ec2.authorize_security_group_ingress(
-    GroupId=sg2_id,
+    GroupId=sg_rds_id,
     IpPermissions=[
         {
             "IpProtocol": "tcp",
             "FromPort": 3306,
             "ToPort": 3306,
-            "UserIdGroupPairs": [{"GroupId": sg1_id}]
+            "UserIdGroupPairs": [{"GroupId": sg_ec2_id}]
         }
     ]
 )
 
-print("SG2 creado:", sg2_id)
+print("SG EC2:", sg_ec2_id)
+print("SG RDS:", sg_rds_id)
 
 # ============================
 # CREAR RDS
@@ -115,11 +109,10 @@ rds.create_db_instance(
     MasterUsername=DB_USER,
     MasterUserPassword=DB_PASS,
     DBName=DB_NAME,
-    PubliclyAccessible=True,
-    VpcSecurityGroupIds=[sg2_id]
+    VpcSecurityGroupIds=[sg_rds_id],
 )
 
-print("Esperando a que RDS esté disponible (puede tardar varios minutos)...")
+print("Esperando a que RDS esté disponible...")
 waiter = rds.get_waiter("db_instance_available")
 waiter.wait(DBInstanceIdentifier=DB_INSTANCE_ID)
 
@@ -131,119 +124,127 @@ print("RDS listo:", DB_ENDPOINT)
 # ============================
 # CREAR S3 Y SUBIR ARCHIVOS
 # ============================
-def upload_static_to_s3(bucket, directory, region):
-    s3 = boto3.client("s3", region_name=region)
+bucket_name = f"banco-riendo-static-{int(time.time())}"
+print("Creando bucket:", bucket_name)
 
-    # Crear bucket
-    existing = [b["Name"] for b in s3.list_buckets().get("Buckets", [])]
-    if bucket not in existing:
-        params = {"Bucket": bucket}
-        if region != "us-east-1":
-            params["CreateBucketConfiguration"] = {"LocationConstraint": region}
-        s3.create_bucket(**params)
-        print(f"Bucket creado: {bucket}")
+s3.create_bucket(Bucket=bucket_name)
+time.sleep(3)
+
+# Subir archivos
+print("Subiendo archivos desde:", LOCAL_FILES_DIR)
+
+for filename in os.listdir(LOCAL_FILES_DIR):
+    path = os.path.join(LOCAL_FILES_DIR, filename)
+
+    if not os.path.isfile(path):
+        continue
+
+    if filename.endswith(".html"):
+        ctype = "text/html"
+    elif filename.endswith(".css"):
+        ctype = "text/css"
+    elif filename.endswith(".js"):
+        ctype = "application/javascript"
     else:
-        print("Bucket ya existe.")
+        ctype = "application/octet-stream"
 
-    # Subir archivos
-    for filename in os.listdir(directory):
-        filepath = os.path.join(directory, filename)
-        if not os.path.isfile(filepath):
-            continue
-
-        # Tipo de archivo
-        if filename.endswith(".html"):
-            ctype = "text/html"
-        elif filename.endswith(".css"):
-            ctype = "text/css"
-        elif filename.endswith(".js"):
-            ctype = "application/javascript"
-        elif filename.endswith(".php"):
-            ctype = "application/x-httpd-php"
-        elif filename.endswith(".sql"):
-           ctype = "application/sql"
-        else:
-            ctype = "application/octet-stream"
-        with open(filepath, "rb") as f:
-            content = f.read()
-
+    with open(path, "rb") as f:
         s3.put_object(
-            Bucket=bucket,
+            Bucket=bucket_name,
             Key=filename,
-            Body=content,
+            Body=f,
             ContentType=ctype
         )
 
-        print("Archivo subido:", filename)
+print("Archivos cargados a S3 correctamente.")
 
-print("Subiendo archivos a S3...")
-upload_static_to_s3(BUCKET_NAME, LOCAL_FILES_DIR, REGION)
-
-
-# ============================
-# USER-DATA PARA EC2
-# ============================
-user_data = f"""#!/bin/bash
-exec > /var/log/user-data.log 2>&1
-set -x
-sudo yum update -y
-sudo dnf -y install awscli
-sudo amazon-linux-extras enable php8.2
-sudo yum clean metadata
-sudo dnf clean all
-sudo dnf makecache
-sudo dnf -y update
-sudo dnf -y install httpd php php-cli php-fpm php-common php-mysqlnd mariadb105 mariadb
-
-sudo systemctl enable --now httpd
-sudo systemctl enable --now php-fpm
-
-echo '<FilesMatch \\.php$>
-  SetHandler "proxy:unix:/run/php-fpm/www.sock|fcgi://localhost/"
-</FilesMatch>' | sudo tee /etc/httpd/conf.d/php-fpm.conf
-
-echo "<?php phpinfo(); ?>" | sudo tee /var/www/html/info.php
-
-# =============================
-# Descarga de archivos desde S3
-# =============================
-sudo mkdir -p /var/www/html
-cd /var/www/html
-sudo aws s3 cp s3://{BUCKET_NAME}/ . --recursive
-
-# =============================
-# Crear archivo .env con credenciales dinámicas
-# =============================
-sudo tee /var/www/.env >/dev/null <<ENV
+# =========================
+# SUBIR ARCHIVO .env
+# =========================
+env_content = f"""
 DB_HOST={DB_ENDPOINT}
 DB_NAME={DB_NAME}
 DB_USER={DB_USER}
 DB_PASS={DB_PASS}
 
-# Variables de aplicación
-APP_USER=admin
-APP_PASS=admin123
-ENV
+APP_USER={APP_USER}
+APP_PASS={APP_PASS}
+"""
 
+s3.put_object(
+    Bucket=bucket_name,
+    Key=".env",
+    Body=env_content,
+    ContentType="text/plain"
+)
+
+# ============================
+# USER-DATA PARA EC2
+# ============================
+user_data = rf"""#!/bin/bash
+exec > /var/log/user-data.log 2>&1
+set -x
+
+sudo dnf -y install awscli || sudo yum install -y awscli || true
+sudo dnf -y update || sudo yum -y update || true
+
+sudo amazon-linux-extras enable php8.2
+sudo yum clean metadata || true
+sudo dnf -y install httpd php php-cli php-fpm php-common php-mysqlnd mariadb105 || true
+
+sudo systemctl enable --now php-fpm
+sudo systemctl enable --now httpd
+sudo systemctl start httpd || true
+
+# Configuración php-fpm para Apache (FilesMatch necesita \.php$ — raw string evita warnings)
+cat <<'EOF' | sudo tee /etc/httpd/conf.d/php-fpm.conf
+<FilesMatch \.php$>
+    SetHandler "proxy:unix:/run/php-fpm/www.sock|fcgi://localhost/"
+</FilesMatch>
+EOF
+
+sudo mkdir -p /var/www/html
+sudo mkdir -p /home/ec2-user
+cd /var/www/html
+
+# Descargar archivos web desde S3
+sudo aws s3 cp s3://{bucket_name}/index.php ./
+sudo aws s3 cp s3://{bucket_name}/config.php ./
+sudo aws s3 cp s3://{bucket_name}/login.php ./
+sudo aws s3 cp s3://{bucket_name}/app.js ./
+sudo aws s3 cp s3://{bucket_name}/login.js ./
+sudo aws s3 cp s3://{bucket_name}/app.css ./
+sudo aws s3 cp s3://{bucket_name}/login.css ./
+sudo aws s3 cp s3://{bucket_name}/index.html ./
+sudo aws s3 cp s3://{bucket_name}/login.html ./
+
+cd /var/www
+
+sudo aws s3 cp s3://{bucket_name}/.env ./ || true
 sudo chown apache:apache /var/www/.env
 sudo chmod 600 /var/www/.env
 
-# =============================
-# Inicializar base de datos
-# =============================
-mysql -h {DB_ENDPOINT} -u {DB_USER} -p{DB_PASS} {DB_NAME} < /var/www/html/init_db.sql
+cd /home/ec2-user
+sudo aws s3 cp s3://{bucket_name}/init_db.sql ./ || true
+if [ -f /home/ec2-user/init_db.sql ]; then
+    # Esperar unos segundos a que MariaDB esté listo a responder conexiones
+    sleep 10
+    mysql -h {DB_ENDPOINT} -u {DB_USER} -p{DB_PASS} {DB_NAME} < /home/ec2-user/init_db.sql || true
+else
+    echo "init_db.sql no encontrado en S3: omitiendo import."
+fi
 
-# =============================
-# Permisos correctos para Apache
-# =============================
-sudo chown -R apache:apache /var/www/html
-sudo setenforce 0
+sudo chown -R apache:apache /var/www
+sudo chmod -R 755 /var/www/html || true
 
-# =============================
-# Reiniciar servicios
-# =============================
-sudo systemctl restart httpd php-fpm
+# Desactivar enforcement de SELinux en runtime (para evitar problemas de acceso)
+if command -v setenforce >/dev/null 2>&1; then
+    sudo setenforce 0 || true
+    sudo sed -i 's/^SELINUX=enforcing/SELINUX=permissive/' /etc/selinux/config || true
+fi
 
+# Reiniciar servicios para aplicar cambios
+sudo systemctl restart httpd php-fpm || true
 """
 
 # ============================
@@ -256,7 +257,7 @@ instance = ec2.run_instances(
     InstanceType=INSTANCE_TYPE,
     MinCount=1,
     MaxCount=1,
-    SecurityGroupIds=[sg1_id],
+    SecurityGroupIds=[sg_ec2_id],
     UserData=user_data,
     TagSpecifications=[
         {
@@ -267,6 +268,10 @@ instance = ec2.run_instances(
 )
 
 instance_id = instance["Instances"][0]["InstanceId"]
+print("EC2 creada:", instance_id)
+
+print("Esperando IP pública...")
+
 waiter = ec2.get_waiter("instance_running")
 waiter.wait(InstanceIds=[instance_id])
 
@@ -277,5 +282,5 @@ print("=======================================================")
 print("DEPLOY COMPLETADO")
 print("IP pública del EC2:", public_ip)
 print("URL:", f"http://{public_ip}/index.php")
-print("RDS Endpoint:", DB_ENDPOINT)
+print("Bucket S3:", bucket_name)
 print("=======================================================")
