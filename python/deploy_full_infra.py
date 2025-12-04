@@ -19,8 +19,6 @@ DB_USER = "admin"
 LOCAL_FILES_DIR = os.path.expanduser("~/obligatorio-prog-devops/python/archivos")
 PASSWORD_FILE = os.path.expanduser("~/obligatorio-prog-devops/python/archivos/password.txt")
 
-BUCKET_NAME = "app-bancoriendo"
-
 APP_USER = "admin"
 APP_PASS = "admin123"
 
@@ -44,7 +42,7 @@ rds = boto3.client("rds", region_name=REGION)
 s3 = boto3.client("s3", region_name=REGION)
 
 # ============================
-# Crear Security Group 1
+# Security Groups
 # ============================
 print("Creando Security Groups...")
 
@@ -70,9 +68,7 @@ ec2.authorize_security_group_ingress(
     ]
 )
 
-# ============================
-# Crear Security Group 2
-# ============================
+# SG privado para RDS
 sg_rds = ec2.create_security_group(
     GroupName="SG_RDS_Privado",
     Description="SQL permitido solo desde EC2",
@@ -122,7 +118,7 @@ DB_ENDPOINT = rds_info["DBInstances"][0]["Endpoint"]["Address"]
 print("RDS listo:", DB_ENDPOINT)
 
 # ============================
-# CREAR S3 Y SUBIR ARCHIVOS
+# CREAR BUCKET S3 Y SUBIR ARCHIVOS
 # ============================
 bucket_name = f"banco-riendo-static-{int(time.time())}"
 print("Creando bucket:", bucket_name)
@@ -130,7 +126,6 @@ print("Creando bucket:", bucket_name)
 s3.create_bucket(Bucket=bucket_name)
 time.sleep(3)
 
-# Subir archivos
 print("Subiendo archivos desde:", LOCAL_FILES_DIR)
 
 for filename in os.listdir(LOCAL_FILES_DIR):
@@ -158,9 +153,9 @@ for filename in os.listdir(LOCAL_FILES_DIR):
 
 print("Archivos cargados a S3 correctamente.")
 
-# =========================
-# SUBIR ARCHIVO .env
-# =========================
+# ============================
+# SUBIR .env
+# ============================
 env_content = f"""
 DB_HOST={DB_ENDPOINT}
 DB_NAME={DB_NAME}
@@ -179,76 +174,54 @@ s3.put_object(
 )
 
 # ============================
-# USER-DATA PARA EC2
+# USER DATA
 # ============================
 user_data = rf"""#!/bin/bash
 exec > /var/log/user-data.log 2>&1
 set -x
 
-sudo dnf -y install awscli || sudo yum install -y awscli || true
-sudo dnf -y update || sudo yum -y update || true
+yum update -y
+amazon-linux-extras enable php8.2
+yum clean metadata
+dnf -y install httpd php php-cli php-fpm php-common php-mysqlnd mariadb105 awscli
 
-sudo amazon-linux-extras enable php8.2
-sudo yum clean metadata || true
-sudo dnf -y install httpd php php-cli php-fpm php-common php-mysqlnd mariadb105 || true
+systemctl enable php-fpm --now
+systemctl enable httpd
+systemctl restart httpd
 
-sudo systemctl enable --now php-fpm
-sudo systemctl enable --now httpd
-sudo systemctl start httpd || true
-
-# Configuración php-fpm para Apache (FilesMatch necesita \.php$ — raw string evita warnings)
-cat <<'EOF' | sudo tee /etc/httpd/conf.d/php-fpm.conf
+cat <<EOF >/etc/httpd/conf.d/php-fpm.conf
 <FilesMatch \.php$>
     SetHandler "proxy:unix:/run/php-fpm/www.sock|fcgi://localhost/"
 </FilesMatch>
 EOF
 
-sudo mkdir -p /var/www/html
-sudo mkdir -p /home/ec2-user
+mkdir -p /var/www/html
+mkdir -p /var/www
+
 cd /var/www/html
+aws s3 cp s3://__BUCKET__/ . --recursive
 
-# Descargar archivos web desde S3
-sudo aws s3 cp s3://{bucket_name}/index.php ./
-sudo aws s3 cp s3://{bucket_name}/config.php ./
-sudo aws s3 cp s3://{bucket_name}/login.php ./
-sudo aws s3 cp s3://{bucket_name}/app.js ./
-sudo aws s3 cp s3://{bucket_name}/login.js ./
-sudo aws s3 cp s3://{bucket_name}/app.css ./
-sudo aws s3 cp s3://{bucket_name}/login.css ./
-sudo aws s3 cp s3://{bucket_name}/index.html ./
-sudo aws s3 cp s3://{bucket_name}/login.html ./
+aws s3 cp s3://__BUCKET__/.env /var/www/.env
+chmod 640 /var/www/.env
+chown apache:apache /var/www/.env
 
-cd /var/www
+sed -i "s/<endpoint-rds>/__ENDPOINT__/" /var/www/.env
 
-sudo aws s3 cp s3://{bucket_name}/.env ./ || true
-sudo chown apache:apache /var/www/.env
-sudo chmod 600 /var/www/.env
+chown -R apache:apache /var/www/html
+chmod -R 755 /var/www/html
 
-cd /home/ec2-user
-sudo aws s3 cp s3://{bucket_name}/init_db.sql ./ || true
-if [ -f /home/ec2-user/init_db.sql ]; then
-    # Esperar unos segundos a que MariaDB esté listo a responder conexiones
-    sleep 10
-    mysql -h {DB_ENDPOINT} -u {DB_USER} -p{DB_PASS} {DB_NAME} < /home/ec2-user/init_db.sql || true
-else
-    echo "init_db.sql no encontrado en S3: omitiendo import."
-fi
-
-sudo chown -R apache:apache /var/www
-sudo chmod -R 755 /var/www/html || true
-
-# Desactivar enforcement de SELinux en runtime (para evitar problemas de acceso)
-if command -v setenforce >/dev/null 2>&1; then
-    sudo setenforce 0 || true
-    sudo sed -i 's/^SELINUX=enforcing/SELINUX=permissive/' /etc/selinux/config || true
-fi
-
-# Reiniciar servicios para aplicar cambios
-sudo systemctl restart httpd php-fpm || true
+systemctl restart httpd
 """
 
+# reemplazar marcadores
+user_data = (
+    user_data
+    .replace("__BUCKET__", bucket_name)
+    .replace("__ENDPOINT__", DB_ENDPOINT)
+)
+
 # ============================
-# CREAR INSTANCIA EC2
+# CREAR EC2
 # ============================
 print("Creando instancia EC2...")
 
